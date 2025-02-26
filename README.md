@@ -1,4 +1,4 @@
-# Mojo HyperLogLog
+# Mojo-HyperLogLog
 
 A Mojo implementation of HyperLogLog - a probabilistic data structure for counting unique elements with minimal memory usage.
 
