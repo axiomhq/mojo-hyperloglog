@@ -19,7 +19,7 @@ from murmur import murmur3_64
 
 # Create counter
 var hll = HyperLogLog(14)  # precision = 14
-                          # exact counting up to 2048 elements
+                           # exact counting up to 2048 elements
 
 # Add values
 for i in range(1000):
