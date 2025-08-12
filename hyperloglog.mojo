@@ -3,36 +3,36 @@ from collections import List, Set
 from beta import get_beta
 from bit import count_leading_zeros
 
-struct HyperLogLog:
+struct HyperLogLog[P: Int]:
     """
     HyperLogLog using the LogLog-Beta algorithm for cardinality estimation.
     Provides bias correction for improved accuracy.
     """
-    var precision: Int           # Number of bits used for register indexing (4-16)
-    var max_zeros: Int           # Maximum possible leading zeros
-    var alpha: Float64           # Bias-correction constant 
-    var registers: List[UInt8]  # Dense representation
-    var sparse_set: Set[Int]     # Sparse representation for low cardinality
-    var is_sparse: Bool          # Tracks current representation mode
+    alias precision = P                    # Number of bits used for register indexing (4-16)
+    alias max_zeros = 64 - P              # Maximum possible leading zeros
+    alias m = 1 << P                      # Number of registers
+    var registers: List[UInt8]            # Dense representation
+    var sparse_set: Set[Int]              # Sparse representation for low cardinality
+    var is_sparse: Bool                   # Tracks current representation mode
 
-    fn __init__(out self, p: Int = 14) raises:
-        """Initialize with precision between 4 and 16."""
-        if p < 4 or p > 16:
-            raise Error("Precision must be between 4 and 16")
-
-        self.precision = p
-        self.max_zeros = 64 - p
-        var m = 1 << p
-
-        # Set alpha based on the number of registers (m)
-        if m == 16:
-            self.alpha = 0.673
-        elif m == 32:
-            self.alpha = 0.697
-        elif m == 64:
-            self.alpha = 0.709
+    @staticmethod
+    @parameter
+    fn _get_alpha() -> Float64:
+        """Get alpha constant at compile time based on precision."""
+        @parameter
+        if P == 4:
+            return 0.673
+        elif P == 5:
+            return 0.697  
+        elif P == 6:
+            return 0.709
         else:
-            self.alpha = 0.7213 / (1.0 + 1.079 / Float64(m))
+            return 0.7213 / (1.0 + 1.079 / Float64(1 << P))
+
+    fn __init__(out self) raises:
+        """Initialize HyperLogLog with compile-time precision P."""
+        # Compile-time validation
+        constrained[P >= 4 and P <= 16, "Precision must be between 4 and 16"]()
 
         # Initialize empty data structures
         self.registers = List[UInt8]()
@@ -41,9 +41,6 @@ struct HyperLogLog:
 
     fn __copyinit__(out self, existing: Self):
         """Copy-initialize from an existing HyperLogLog."""
-        self.precision = existing.precision
-        self.max_zeros = existing.max_zeros
-        self.alpha = existing.alpha
         self.is_sparse = existing.is_sparse
         self.sparse_set = Set[Int]()
 
@@ -52,17 +49,17 @@ struct HyperLogLog:
             for item in existing.sparse_set:
                 self.sparse_set.add(item)
         else:
-            var num_registers = 1 << self.precision
-            self.registers = List[UInt8](num_registers)
-            for i in range(num_registers):
-                self.registers[i] = existing.registers[i]
+            self.registers = List[UInt8]()
+            for i in range(len(existing.registers)):
+                self.registers.append(existing.registers[i])
 
     fn add_hash(mut self, hash: Int):
         """Incorporate a new hash value into the sketch."""
         var hash_int = Int(hash)
         if self.is_sparse:
             # Convert to dense representation when sparse set grows too large
-            if len(self.sparse_set) >= (1 << (self.precision - 3)):
+            alias threshold = 1 << (Self.precision - 3)
+            if len(self.sparse_set) >= threshold:
                 self._convert_to_dense()
                 self._add_to_dense(hash_int)
             else:
@@ -72,9 +69,9 @@ struct HyperLogLog:
 
     fn _get_bucket_and_zeros(mut self, hash_int: Int) -> Tuple[Int, UInt8]:
         """Extract the bucket index and count the leading zeros."""
-        var mask: Int = (1 << self.precision) - 1
-        var bucket: Int = (hash_int >> (64 - self.precision)) & mask
-        var pattern: Int = (hash_int << self.precision) | (1 << (self.precision - 1))
+        alias mask: Int = (1 << Self.precision) - 1
+        var bucket: Int = (hash_int >> (64 - Self.precision)) & mask
+        var pattern: Int = (hash_int << Self.precision) | (1 << (Self.precision - 1))
         var zeros: UInt8 = UInt8(count_leading_zeros(pattern) + 1)
         return bucket, zeros
 
@@ -90,11 +87,10 @@ struct HyperLogLog:
 
     fn _convert_to_dense(mut self):
         """Switch from sparse to dense representation."""
-        var num_registers = 1 << self.precision
-        self.registers = List[UInt8](num_registers)
+        self.registers = List[UInt8]()
 
         # Initialize all registers to 0
-        for _ in range(num_registers):
+        for _ in range(Self.m):
             self.registers.append(0)
         
         # Process all hashes from sparse set
@@ -114,12 +110,11 @@ struct HyperLogLog:
         if self.is_sparse:
             return len(self.sparse_set)
 
-        var m = 1 << self.precision
         var sum: Float64 = 0.0
         var ez: Float64 = 0.0  # Count of empty registers
 
         # Calculate harmonic mean of register values
-        for i in range(m):
+        for i in range(Self.m):
             var reg = self.registers[i]
             if reg == 0:
                 ez += 1.0
@@ -127,12 +122,11 @@ struct HyperLogLog:
                 sum += 1.0 / exp2(Float64(reg))
 
         # Apply LogLog-Beta bias correction
-        return Int(self.alpha * m * (m - ez) / (get_beta(self.precision, ez) + sum))
+        return Int(Self._get_alpha() * Self.m * (Self.m - ez) / (get_beta[Self.precision](ez) + sum))
 
     fn merge(mut self, other: Self) raises:
         """Merge another sketch into this one."""
-        if self.precision != other.precision:
-            raise Error("Cannot merge sketches with different precisions")
+        # Precision is now compile-time guaranteed to match
 
         # Handle dense mode merging
         if not self.is_sparse or not other.is_sparse:
@@ -150,8 +144,7 @@ struct HyperLogLog:
                         self.registers[bucket] = zeros
             else:
                 # Merge dense into dense
-                var m = 1 << self.precision
-                for i in range(m):
+                for i in range(Self.m):
                     if self.registers[i] < other.registers[i]:
                         self.registers[i] = other.registers[i]
         else:
@@ -164,7 +157,7 @@ struct HyperLogLog:
         var buffer = List[UInt8]()
 
         # Write header
-        buffer.append(UInt8(self.precision))
+        buffer.append(UInt8(Self.precision))
         buffer.append(UInt8(1 if self.is_sparse else 0))
 
         if self.is_sparse:
@@ -186,22 +179,24 @@ struct HyperLogLog:
                 self._convert_to_dense()
 
             # Write register values
-            var num_registers = 1 << self.precision
-            for i in range(num_registers):
+            for i in range(Self.m):
                 buffer.append(self.registers[i])
 
         return buffer
 
     @staticmethod
-    fn deserialize(buffer: List[UInt8]) raises -> Self:
+    fn deserialize[TargetP: Int](buffer: List[UInt8]) raises -> HyperLogLog[TargetP]:
         """Deserialize a sketch from the given byte list."""
         if len(buffer) < 2:
             raise Error("Invalid serialized data: buffer too short")
 
-        # Read header
-        var precision = Int(buffer[0])
+        # Read and validate precision matches type parameter
+        var stored_precision = Int(buffer[0])
+        if stored_precision != TargetP:
+            raise Error("Stored precision does not match expected precision")
+            
         var is_sparse = buffer[1] == 1
-        var hll = HyperLogLog(precision)
+        var hll = HyperLogLog[TargetP]()
         hll.is_sparse = is_sparse
 
         if is_sparse:
@@ -224,14 +219,14 @@ struct HyperLogLog:
                 pos += 8
         else:
             # Verify buffer size
-            var expected_size = (1 << precision) + 2
+            alias expected_size = (1 << TargetP) + 2
             if len(buffer) != expected_size:
                 raise Error("Invalid serialized data: wrong buffer length")
 
             # Read register values
-            var num_registers = 1 << precision
-            hll.registers = List[UInt8](num_registers)
+            alias num_registers = 1 << TargetP
+            hll.registers = List[UInt8]()
             for i in range(num_registers):
-                hll.registers[i] = buffer[i + 2]
+                hll.registers.append(buffer[i + 2])
 
         return hll

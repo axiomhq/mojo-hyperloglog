@@ -13,21 +13,21 @@ fn hash_int(x: Int) -> Int:
 
 fn benchmark_add_sparse() raises:
     """Benchmark adding elements while HLL remains in sparse mode."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     for i in range(1000):  # Small enough to stay sparse
         hll.add_hash(hash_int(i))
 
 
 fn benchmark_add_dense() raises:
     """Benchmark adding elements in dense mode."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     for i in range(100_000):  # Large enough to trigger dense mode
         hll.add_hash(hash_int(i))
 
 
 fn benchmark_cardinality_sparse() raises:
     """Benchmark cardinality estimation in sparse mode."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     for i in range(1000):
         hll.add_hash(hash_int(i))
     _ = hll.cardinality()
@@ -35,7 +35,7 @@ fn benchmark_cardinality_sparse() raises:
 
 fn benchmark_cardinality_dense() raises:
     """Benchmark cardinality estimation in dense mode."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     for i in range(100_000):
         hll.add_hash(hash_int(i))
     _ = hll.cardinality()
@@ -43,8 +43,8 @@ fn benchmark_cardinality_dense() raises:
 
 fn benchmark_merge_sparse() raises:
     """Benchmark merging two sparse HLLs."""
-    var hll1 = HyperLogLog(14)
-    var hll2 = HyperLogLog(14)
+    var hll1 = HyperLogLog[14]()
+    var hll2 = HyperLogLog[14]()
     for i in range(1000):
         hll1.add_hash(hash_int(i))
         hll2.add_hash(hash_int(i + 1000))
@@ -53,8 +53,8 @@ fn benchmark_merge_sparse() raises:
 
 fn benchmark_merge_dense() raises:
     """Benchmark merging two dense HLLs."""
-    var hll1 = HyperLogLog(14)
-    var hll2 = HyperLogLog(14)
+    var hll1 = HyperLogLog[14]()
+    var hll2 = HyperLogLog[14]()
     for i in range(100_000):
         hll1.add_hash(hash_int(i))
         hll2.add_hash(hash_int(i + 100_000))

@@ -40,25 +40,25 @@ fn murmur3_64(key: Int, seed: UInt64 = 0) -> UInt64:
 fn test_initialization() raises:
     """Test HyperLogLog initialization with different precision values."""
     # Test valid precision
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     assert_equal(hll.precision, 14)
     assert_equal(hll.max_zeros, 50)  # 64 - 14
     assert_true(hll.is_sparse)
 
     # Test minimum precision
-    var hll_min = HyperLogLog(4)
+    var hll_min = HyperLogLog[4]()
     assert_equal(hll_min.precision, 4)
     assert_equal(hll_min.max_zeros, 60)  # 64 - 4
 
     # Test maximum precision
-    var hll_max = HyperLogLog(16)
+    var hll_max = HyperLogLog[16]()
     assert_equal(hll_max.precision, 16)
     assert_equal(hll_max.max_zeros, 48)  # 64 - 16
 
 
 fn test_sparse_to_dense_conversion() raises:
     """Test conversion from sparse to dense representation."""
-    var hll = HyperLogLog(4)  # Small precision for easier testing
+    var hll = HyperLogLog[4]()  # Small precision for easier testing
     var num_registers = 1 << 4
 
     # Add elements until conversion threshold
@@ -73,7 +73,7 @@ fn test_sparse_to_dense_conversion() raises:
 fn test_sparse_register_state() raises:
     """Test that registers vector is not allocated until conversion from sparse mode.
     """
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
 
     # Add some values but stay in sparse mode
     for i in range(100):
@@ -120,7 +120,7 @@ fn test_sparse_register_state() raises:
 
 fn test_cardinality_low_cardinality() raises:
     """Test cardinality estimation for small range of values."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     var test_size = 100
 
     # Add values from 1 to 100
@@ -135,7 +135,7 @@ fn test_cardinality_low_cardinality() raises:
 
 fn test_cardinality_large_cardinality() raises:
     """Test cardinality estimation for large range of values."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     var test_size = 100_000
 
     # Add values from 1 to 100K
@@ -151,8 +151,8 @@ fn test_cardinality_large_cardinality() raises:
 
 fn test_merge_sparse_sparse() raises:
     """Test merging two HyperLogLog sketches."""
-    var hll1 = HyperLogLog(14)
-    var hll2 = HyperLogLog(14)
+    var hll1 = HyperLogLog[14]()
+    var hll2 = HyperLogLog[14]()
     var test_size = 1000
 
     # Add different values to each sketch
@@ -176,8 +176,8 @@ fn test_merge_sparse_sparse() raises:
 
 fn test_merge_dense_dense() raises:
     """Test merging two HyperLogLog sketches."""
-    var hll1 = HyperLogLog(14)
-    var hll2 = HyperLogLog(14)
+    var hll1 = HyperLogLog[14]()
+    var hll2 = HyperLogLog[14]()
     var test_size = 100_000
 
     # Add different values to each sketch
@@ -201,8 +201,8 @@ fn test_merge_dense_dense() raises:
 
 fn test_merge_sparse_dense() raises:
     """Test merging sparse and dense HyperLogLog sketches."""
-    var hll_sparse = HyperLogLog(14)
-    var hll_dense = HyperLogLog(14)
+    var hll_sparse = HyperLogLog[14]()
+    var hll_dense = HyperLogLog[14]()
 
     # Make first sketch sparse (small cardinality < 1K)
     for i in range(500):
@@ -237,8 +237,8 @@ fn test_merge_sparse_dense() raises:
 
 fn test_merge_different_sizes() raises:
     """Test merging HyperLogLog sketches with different sizes."""
-    var hll_small = HyperLogLog(14)
-    var hll_large = HyperLogLog(14)
+    var hll_small = HyperLogLog[14]()
+    var hll_large = HyperLogLog[14]()
 
     # Add small number to first sketch (< 1K)
     for i in range(800):
@@ -260,7 +260,7 @@ fn test_merge_different_sizes() raises:
 
 fn test_serialization() raises:
     """Test serialization and deserialization."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     var test_size = 1000000
 
     # Add some values
@@ -269,7 +269,7 @@ fn test_serialization() raises:
 
     # Serialize and deserialize
     var serialized = hll.serialize()
-    var deserialized = HyperLogLog.deserialize(serialized)
+    var deserialized = HyperLogLog[14].deserialize[14](serialized)
 
     # Verify properties
     assert_equal(deserialized.precision, hll.precision)
@@ -283,7 +283,7 @@ fn test_serialization() raises:
 
 fn test_serialization_sparse() raises:
     """Test serialization of sparse HyperLogLog."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     var test_size = 100  # Small enough to stay sparse
 
     # Add some values
@@ -294,7 +294,7 @@ fn test_serialization_sparse() raises:
 
     # Serialize and deserialize
     var serialized = hll.serialize()
-    var deserialized = HyperLogLog.deserialize(serialized)
+    var deserialized = HyperLogLog[14].deserialize[14](serialized)
 
     # Verify properties
     assert_equal(deserialized.precision, hll.precision)
@@ -304,7 +304,7 @@ fn test_serialization_sparse() raises:
 
 fn test_serialization_dense() raises:
     """Test serialization of dense HyperLogLog."""
-    var hll = HyperLogLog(14)
+    var hll = HyperLogLog[14]()
     var test_size = 1000000  # Large enough to convert to dense
 
     # Add values to force dense conversion
@@ -315,7 +315,7 @@ fn test_serialization_dense() raises:
 
     # Serialize and deserialize
     var serialized = hll.serialize()
-    var deserialized = HyperLogLog.deserialize(serialized)
+    var deserialized = HyperLogLog[14].deserialize[14](serialized)
 
     # Verify properties
     assert_equal(deserialized.precision, hll.precision)
@@ -329,7 +329,7 @@ fn test_serialization_dense() raises:
 
 fn test_copy_low_cardinality() raises:
     """Test copying HyperLogLog sketches with low cardinality."""
-    var original = HyperLogLog(14)
+    var original = HyperLogLog[14]()
     var test_size = 1000
 
     # Add values to original
@@ -354,7 +354,7 @@ fn test_copy_low_cardinality() raises:
 
 fn test_copy_high_cardinality() raises:
     """Test copying HyperLogLog sketches with high cardinality."""
-    var original = HyperLogLog(14)
+    var original = HyperLogLog[14]()
     var test_size = 1000000  # Large enough to convert to dense
 
     # Add values to original
@@ -368,3 +368,52 @@ fn test_copy_high_cardinality() raises:
     assert_equal(copied.precision, original.precision)
     assert_equal(copied.is_sparse, original.is_sparse)
     assert_equal(copied.cardinality(), original.cardinality())
+
+
+fn main() raises:
+    """Run all HyperLogLog tests."""
+    print("Running HyperLogLog tests...")
+    
+    print("✓ Testing initialization...")
+    test_initialization()
+    
+    print("✓ Testing sparse to dense conversion...")
+    test_sparse_to_dense_conversion()
+    
+    print("✓ Testing sparse register state...")
+    test_sparse_register_state()
+    
+    print("✓ Testing low cardinality...")
+    test_cardinality_low_cardinality()
+    
+    print("✓ Testing large cardinality...")
+    test_cardinality_large_cardinality()
+    
+    print("✓ Testing sparse-sparse merge...")
+    test_merge_sparse_sparse()
+    
+    print("✓ Testing dense-dense merge...")
+    test_merge_dense_dense()
+    
+    print("✓ Testing sparse-dense merge...")
+    test_merge_sparse_dense()
+    
+    print("✓ Testing merge different sizes...")
+    test_merge_different_sizes()
+    
+    print("✓ Testing serialization...")
+    test_serialization()
+    
+    print("✓ Testing sparse serialization...")
+    test_serialization_sparse()
+    
+    print("✓ Testing dense serialization...")
+    test_serialization_dense()
+    
+    print("✓ Testing copy with low cardinality...")
+    test_copy_low_cardinality()
+    
+    print("✓ Testing copy with high cardinality...")
+    test_copy_high_cardinality()
+    
+    print("\n✅ All tests passed!")
