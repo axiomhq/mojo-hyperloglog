@@ -1,5 +1,5 @@
 from math import log2, exp2
-from collections import InlinedFixedVector, List, Set
+from collections import List, Set
 from beta import get_beta
 from bit import count_leading_zeros
 
@@ -10,12 +10,12 @@ struct HyperLogLog:
     """
     var precision: Int           # Number of bits used for register indexing (4-16)
     var max_zeros: Int           # Maximum possible leading zeros
-    var alpha: Float64           # Bias-correction constant
-    var registers: InlinedFixedVector[UInt8]  # Dense representation
+    var alpha: Float64           # Bias-correction constant 
+    var registers: List[UInt8]  # Dense representation
     var sparse_set: Set[Int]     # Sparse representation for low cardinality
     var is_sparse: Bool          # Tracks current representation mode
 
-    fn __init__(mut self, p: Int = 14) raises:
+    fn __init__(out self, p: Int = 14) raises:
         """Initialize with precision between 4 and 16."""
         if p < 4 or p > 16:
             raise Error("Precision must be between 4 and 16")
@@ -35,11 +35,11 @@ struct HyperLogLog:
             self.alpha = 0.7213 / (1.0 + 1.079 / Float64(m))
 
         # Initialize empty data structures
-        self.registers = InlinedFixedVector[UInt8](0)
+        self.registers = List[UInt8]()
         self.sparse_set = Set[Int]()
         self.is_sparse = True
 
-    fn __copyinit__(mut self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy-initialize from an existing HyperLogLog."""
         self.precision = existing.precision
         self.max_zeros = existing.max_zeros
@@ -48,14 +48,14 @@ struct HyperLogLog:
         self.sparse_set = Set[Int]()
 
         if self.is_sparse:
-            self.registers = InlinedFixedVector[UInt8](0)
+            self.registers = List[UInt8]()
             for item in existing.sparse_set:
-                self.sparse_set.add(item[])
+                self.sparse_set.add(item)
         else:
             var num_registers = 1 << self.precision
-            self.registers = InlinedFixedVector[UInt8](num_registers)
+            self.registers = List[UInt8](num_registers)
             for i in range(num_registers):
-                self.registers.__setitem__(i, existing.registers[i])
+                self.registers[i] = existing.registers[i]
 
     fn add_hash(mut self, hash: Int):
         """Incorporate a new hash value into the sketch."""
@@ -86,12 +86,12 @@ struct HyperLogLog:
         var zeros: UInt8
         bucket, zeros = self._get_bucket_and_zeros(hash_int)
         if self.registers[bucket] < zeros:
-            self.registers.__setitem__(bucket, zeros)
+            self.registers[bucket] = zeros
 
     fn _convert_to_dense(mut self):
         """Switch from sparse to dense representation."""
         var num_registers = 1 << self.precision
-        self.registers = InlinedFixedVector[UInt8](num_registers)
+        self.registers = List[UInt8](num_registers)
 
         # Initialize all registers to 0
         for _ in range(num_registers):
@@ -99,12 +99,12 @@ struct HyperLogLog:
         
         # Process all hashes from sparse set
         for h in self.sparse_set:
-            var value = h[]
+            var value = h
             var bucket: Int
             var zeros: UInt8
             bucket, zeros = self._get_bucket_and_zeros(value)
             if self.registers[bucket] < zeros:
-                self.registers.__setitem__(bucket, zeros)
+                self.registers[bucket] = zeros
 
         self.is_sparse = False
         self.sparse_set.clear()
@@ -142,22 +142,22 @@ struct HyperLogLog:
             if other.is_sparse:
                 # Merge sparse into dense
                 for h in other.sparse_set:
-                    var value = h[]
+                    var value = h
                     var bucket: Int
                     var zeros: UInt8
                     bucket, zeros = self._get_bucket_and_zeros(value)
                     if self.registers[bucket] < zeros:
-                        self.registers.__setitem__(bucket, zeros)
+                        self.registers[bucket] = zeros
             else:
                 # Merge dense into dense
                 var m = 1 << self.precision
                 for i in range(m):
                     if self.registers[i] < other.registers[i]:
-                        self.registers.__setitem__(i, other.registers[i])
+                        self.registers[i] = other.registers[i]
         else:
             # Both are sparse, simply merge sets
             for h in other.sparse_set:
-                self.sparse_set.add(h[])
+                self.sparse_set.add(h)
 
     fn serialize(mut self) -> List[UInt8]:
         """Serialize the sketch into a byte list."""
@@ -177,7 +177,7 @@ struct HyperLogLog:
 
             # Write sparse set values
             for h in self.sparse_set:
-                var value = h[]
+                var value = h
                 for shift in range(56, -8, -8):
                     buffer.append(UInt8((value >> shift) & 0xFF))
         else:
@@ -230,8 +230,8 @@ struct HyperLogLog:
 
             # Read register values
             var num_registers = 1 << precision
-            hll.registers = InlinedFixedVector[UInt8](num_registers)
+            hll.registers = List[UInt8](num_registers)
             for i in range(num_registers):
-                hll.registers.__setitem__(i, buffer[i + 2])
+                hll.registers[i] = buffer[i + 2]
 
         return hll
