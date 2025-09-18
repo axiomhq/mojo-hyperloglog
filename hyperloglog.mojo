@@ -3,7 +3,7 @@ from collections import List, Set
 from beta import get_beta
 from bit import count_leading_zeros
 
-struct HyperLogLog[P: Int]:
+struct HyperLogLog[P: Int](ImplicitlyCopyable):
     """
     HyperLogLog using the LogLog-Beta algorithm for cardinality estimation.
     Provides bias correction for improved accuracy.
@@ -23,7 +23,7 @@ struct HyperLogLog[P: Int]:
         if P == 4:
             return 0.673
         elif P == 5:
-            return 0.697  
+            return 0.697
         elif P == 6:
             return 0.709
         else:
@@ -92,7 +92,7 @@ struct HyperLogLog[P: Int]:
         # Initialize all registers to 0
         for _ in range(Self.m):
             self.registers.append(0)
-        
+
         # Process all hashes from sparse set
         for h in self.sparse_set:
             var value = h
@@ -114,12 +114,13 @@ struct HyperLogLog[P: Int]:
         var ez: Float64 = 0.0  # Count of empty registers
 
         # Calculate harmonic mean of register values
-        for i in range(Self.m):
-            var reg = self.registers[i]
-            if reg == 0:
-                ez += 1.0
-            else:
-                sum += 1.0 / exp2(Float64(reg))
+        alias vector_width = min(Self.m, 64)
+        for i in range(0, Self.m, vector_width):
+            var reg = self.registers.unsafe_ptr().load[width=vector_width](i)
+            var reg_flag = reg.eq(0)
+            ez += Float64(reg_flag.cast[DType.uint8]().reduce_add())
+            var exp_reg = reg_flag.select(SIMD[DType.float16, vector_width](0), 1 / exp2(reg.cast[DType.float16]()))
+            sum += exp_reg.reduce_add().cast[DType.float64]()
 
         # Apply LogLog-Beta bias correction
         return Int(Self._get_alpha() * Self.m * (Self.m - ez) / (get_beta[Self.precision](ez) + sum))
@@ -182,7 +183,7 @@ struct HyperLogLog[P: Int]:
             for i in range(Self.m):
                 buffer.append(self.registers[i])
 
-        return buffer
+        return buffer^
 
     @staticmethod
     fn deserialize[TargetP: Int](buffer: List[UInt8]) raises -> HyperLogLog[TargetP]:
@@ -194,7 +195,7 @@ struct HyperLogLog[P: Int]:
         var stored_precision = Int(buffer[0])
         if stored_precision != TargetP:
             raise Error("Stored precision does not match expected precision")
-            
+
         var is_sparse = buffer[1] == 1
         var hll = HyperLogLog[TargetP]()
         hll.is_sparse = is_sparse
@@ -204,7 +205,7 @@ struct HyperLogLog[P: Int]:
                 raise Error("Invalid serialized data: sparse buffer too short")
 
             # Read sparse set size
-            var count = (Int(buffer[2]) << 24) | (Int(buffer[3]) << 16) | 
+            var count = (Int(buffer[2]) << 24) | (Int(buffer[3]) << 16) |
                        (Int(buffer[4]) << 8) | Int(buffer[5])
 
             # Read sparse set values
@@ -229,4 +230,4 @@ struct HyperLogLog[P: Int]:
             for i in range(num_registers):
                 hll.registers.append(buffer[i + 2])
 
-        return hll
+        return hll^

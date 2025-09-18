@@ -1,4 +1,4 @@
-from benchmark import benchmark, Unit
+from benchmark import Bench, BenchConfig, BenchId, Bencher, keep
 from hyperloglog import HyperLogLog
 
 
@@ -10,85 +10,125 @@ fn hash_int(x: Int) -> Int:
     h = (h >> 16) ^ h
     return h
 
-
-fn benchmark_add_sparse() raises:
+@parameter
+fn benchmark_add_sparse(mut b: Bencher) raises:
     """Benchmark adding elements while HLL remains in sparse mode."""
     var hll = HyperLogLog[14]()
-    for i in range(1000):  # Small enough to stay sparse
-        hll.add_hash(hash_int(i))
+    @always_inline
+    @parameter
+    fn call_fn():
+        for i in range(1000):  # Small enough to stay sparse
+            hll.add_hash(hash_int(i))
+        keep(hll.registers._data)  # Prevent optimization away
+
+    b.iter[call_fn]()
 
 
-fn benchmark_add_dense() raises:
+@parameter
+fn benchmark_add_dense(mut b: Bencher) raises:
     """Benchmark adding elements in dense mode."""
     var hll = HyperLogLog[14]()
-    for i in range(100_000):  # Large enough to trigger dense mode
-        hll.add_hash(hash_int(i))
+    @always_inline
+    @parameter
+    fn call_fn():
+        for i in range(100_000):  # Large enough to trigger dense mode
+            hll.add_hash(hash_int(i))
+        keep(hll.registers._data)  # Prevent optimization away
+
+    b.iter[call_fn]()
+    
 
 
-fn benchmark_cardinality_sparse() raises:
-    """Benchmark cardinality estimation in sparse mode."""
+@parameter
+fn benchmark_cardinality_sparse(mut b: Bencher) raises:
     var hll = HyperLogLog[14]()
     for i in range(1000):
         hll.add_hash(hash_int(i))
-    _ = hll.cardinality()
+
+    @always_inline
+    @parameter
+    fn call_fn():
+        var c = hll.cardinality()
+        keep(c)  # Prevent optimization away
+
+    b.iter[call_fn]()
 
 
-fn benchmark_cardinality_dense() raises:
-    """Benchmark cardinality estimation in dense mode."""
+@parameter
+fn benchmark_cardinality_dense(mut b: Bencher) raises:
     var hll = HyperLogLog[14]()
     for i in range(100_000):
         hll.add_hash(hash_int(i))
-    _ = hll.cardinality()
 
+    @always_inline
+    @parameter
+    fn call_fn():
+        var c = hll.cardinality()
+        keep(c)  # Prevent optimization away
 
-fn benchmark_merge_sparse() raises:
+    b.iter[call_fn]()
+
+@parameter
+fn benchmark_merge_sparse(mut b: Bencher) raises:
     """Benchmark merging two sparse HLLs."""
     var hll1 = HyperLogLog[14]()
     var hll2 = HyperLogLog[14]()
     for i in range(1000):
         hll1.add_hash(hash_int(i))
         hll2.add_hash(hash_int(i + 1000))
-    hll1.merge(hll2)
 
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        hll1.merge(hll2)
+    
+    b.iter[call_fn]()
+    _ = hll1
+    _ = hll2
 
-fn benchmark_merge_dense() raises:
+@parameter
+fn benchmark_merge_dense(mut b: Bencher) raises:
     """Benchmark merging two dense HLLs."""
     var hll1 = HyperLogLog[14]()
     var hll2 = HyperLogLog[14]()
     for i in range(100_000):
         hll1.add_hash(hash_int(i))
         hll2.add_hash(hash_int(i + 100_000))
-    hll1.merge(hll2)
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        hll1.merge(hll2)
+    
+    b.iter[call_fn]()
+    _ = hll1
+    _ = hll2
 
 
 fn main() raises:
-    print("Running HyperLogLog Benchmarks...")
-    print("\nSparse Mode Operations:")
-    print("-----------------------")
+    var m = Bench(
+        BenchConfig(
+            num_repetitions=5,
+        )
+    )
+    m.bench_function[benchmark_add_sparse](
+        BenchId("benchmark_add_sparse 1000 elements"),
+    )
+    m.bench_function[benchmark_add_dense](
+        BenchId("benchmark_add_dense 100_000 elements"),
+    )
 
-    print("\nAdding elements (sparse):")
-    var report = benchmark.run[benchmark_add_sparse]()
-    report.print(Unit.ms)
+    m.bench_function[benchmark_cardinality_sparse](
+        BenchId("benchmark_cardinality_sparse 1000 elements"),
+    )
+    m.bench_function[benchmark_cardinality_dense](
+        BenchId("benchmark_cardinality_dense 100_000 elements"),
+    )
 
-    print("\nCardinality estimation (sparse):")
-    report = benchmark.run[benchmark_cardinality_sparse]()
-    report.print(Unit.ms)
+    m.bench_function[benchmark_merge_sparse](
+        BenchId("benchmark_merge_sparse 1000 elements"),
+    )
+    m.bench_function[benchmark_merge_dense](
+        BenchId("benchmark_merge_dense 100_000 elements"),
+    )
 
-    print("\nMerging HLLs (sparse):")
-    report = benchmark.run[benchmark_merge_sparse]()
-    report.print(Unit.ms)
-
-    print("\nDense Mode Operations:")
-    print("---------------------")
-
-    print("\nAdding elements (dense):")
-    report = benchmark.run[benchmark_add_dense]()
-    report.print(Unit.ms)
-
-    print("\nCardinality estimation (dense):")
-    report = benchmark.run[benchmark_cardinality_dense]()
-    report.print(Unit.ms)
-
-    print("\nMerging HLLs (dense):")
-    report = benchmark.run[benchmark_merge_dense]()
-    report.print(Unit.ms)
+    m.dump_report()
