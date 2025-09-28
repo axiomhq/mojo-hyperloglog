@@ -1,4 +1,12 @@
-from benchmark import benchmark, Unit
+from benchmark import (
+    benchmark,
+    Unit,
+    keep,
+    Bencher,
+    Bench,
+    BenchConfig,
+    BenchId,
+)
 from hyperloglog import HyperLogLog
 
 
@@ -30,15 +38,32 @@ fn benchmark_cardinality_sparse() raises:
     var hll = HyperLogLog[14]()
     for i in range(1000):
         hll.add_hash(hash_int(i))
-    _ = hll.cardinality()
+    var c = hll.cardinality()
+    keep(c)  # Prevent optimization away
 
 
-fn benchmark_cardinality_dense() raises:
+fn benchmark_cardinality_dense_() raises:
     """Benchmark cardinality estimation in dense mode."""
     var hll = HyperLogLog[14]()
     for i in range(100_000):
         hll.add_hash(hash_int(i))
-    _ = hll.cardinality()
+    var c = hll.cardinality()
+    keep(c)  # Prevent optimization away
+
+
+@parameter
+fn benchmark_cardinality_dense(mut b: Bencher) raises:
+    var hll = HyperLogLog[14]()
+    for i in range(100_000):
+        hll.add_hash(hash_int(i))
+
+    @always_inline
+    @parameter
+    fn call_fn():
+        var c = hll.cardinality()
+        keep(c)  # Prevent optimization away
+
+    b.iter[call_fn]()
 
 
 fn benchmark_merge_sparse() raises:
@@ -86,8 +111,15 @@ fn main() raises:
     report.print(Unit.ms)
 
     print("\nCardinality estimation (dense):")
-    report = benchmark.run[benchmark_cardinality_dense]()
-    report.print(Unit.ms)
+    var m = Bench(
+        BenchConfig(
+            num_repetitions=5,
+        )
+    )
+    m.bench_function[benchmark_cardinality_dense](
+        BenchId("benchmark_cardinality_dense EN")
+    )
+    m.dump_report()
 
     print("\nMerging HLLs (dense):")
     report = benchmark.run[benchmark_merge_dense]()

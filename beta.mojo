@@ -8,7 +8,7 @@ from math import log2
 # The beta distribution is defined by two parameters, alpha and beta.
 # The alpha parameter is the shape parameter of the distribution.
 # The beta parameter is the scale parameter of the distribution.
-fn get_beta[P: Int](ez: Float64) -> Float64:
+fn get_beta[P: Int](ez: Float32) -> Float32:
     """SIMD-optimized beta constant calculation using vectorized polynomial evaluation.
     """
 
@@ -22,11 +22,11 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
         var zl6 = zl5 * zl
         var zl7 = zl6 * zl
 
-        var z = SIMD[DType.float64, 8](ez, zl, zl2, zl3, zl4, zl5, zl6, zl7)
+        var z = SIMD[DType.float32, 8](ez, zl, zl2, zl3, zl4, zl5, zl6, zl7)
 
         @parameter
         if P == 4:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.582581413904517,
                 -1.935300357560050,
                 11.079323758035073,
@@ -38,7 +38,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 5:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.7518999460733967,
                 -0.9590030077748760,
                 5.5997371322141607,
@@ -50,7 +50,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 6:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 29.8257900969619634,
                 -31.3287083337725925,
                 -10.5942523036582283,
@@ -62,7 +62,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 7:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 2.8102921290820060,
                 -3.9780498518175995,
                 1.3162680041351582,
@@ -74,7 +74,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 8:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 1.00633544887550519,
                 -2.00580666405112407,
                 1.64369749366514117,
@@ -86,7 +86,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 9:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.09415657458167959,
                 -0.78130975924550528,
                 1.71514946750712460,
@@ -98,7 +98,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 10:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.25935400670790054,
                 -0.52598301999805808,
                 1.48933034925876839,
@@ -110,7 +110,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 11:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.432325553856025,
                 -0.108450736399632,
                 0.609156550741120,
@@ -122,7 +122,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 12:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.384979202588598,
                 0.183162233114364,
                 0.130396688841854,
@@ -134,7 +134,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 13:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.41655270946462997,
                 -0.22146677040685156,
                 0.38862131236999947,
@@ -146,7 +146,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 14:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.371009760230692,
                 0.00978811941207509,
                 0.185796293324165,
@@ -158,7 +158,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 15:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.38215145543875273,
                 -0.89069400536090837,
                 0.37602335774678869,
@@ -170,7 +170,7 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             )
             return (c * z).reduce_add()
         elif P == 16:
-            var c = SIMD[DType.float64, 8](
+            var c = SIMD[DType.float32, 8](
                 -0.37331876643753059,
                 -1.41704077448122989,
                 0.40729184796612533,
@@ -183,8 +183,8 @@ fn get_beta[P: Int](ez: Float64) -> Float64:
             return (c * z).reduce_add()
         # Unreachable
         alias num_registers = 1 << P
-        return 0.7213 / (1.0 + 1.079 / Float64(num_registers))
+        return 0.7213 / (1.0 + 1.079 / Float32(num_registers))
     else:
         # For larger register counts, use the standard beta correction
         alias num_registers = 1 << P
-        return 0.7213 / (1.0 + 1.079 / Float64(num_registers))
+        return 0.7213 / (1.0 + 1.079 / Float32(num_registers))

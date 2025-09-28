@@ -3,7 +3,7 @@ from collections import List, Set
 from beta import get_beta
 from bit import count_leading_zeros
 
-struct HyperLogLog[P: Int]:
+struct HyperLogLog[P: Int](ImplicitlyCopyable):
     """
     HyperLogLog using the LogLog-Beta algorithm for cardinality estimation.
     Provides bias correction for improved accuracy.
@@ -17,7 +17,7 @@ struct HyperLogLog[P: Int]:
 
     @staticmethod
     @parameter
-    fn _get_alpha() -> Float64:
+    fn _get_alpha() -> Float32:
         """Get alpha constant at compile time based on precision."""
         @parameter
         if P == 4:
@@ -27,7 +27,7 @@ struct HyperLogLog[P: Int]:
         elif P == 6:
             return 0.709
         else:
-            return 0.7213 / (1.0 + 1.079 / Float64(1 << P))
+            return 0.7213 / (1.0 + 1.079 / Float32(1 << P))
 
     fn __init__(out self) raises:
         """Initialize HyperLogLog with compile-time precision P."""
@@ -110,16 +110,17 @@ struct HyperLogLog[P: Int]:
         if self.is_sparse:
             return len(self.sparse_set)
 
-        var sum: Float64 = 0.0
-        var ez: Float64 = 0.0  # Count of empty registers
+        var sum: Float32 = 0.0
+        var ez: Float32 = 0.0  # Count of empty registers
 
         # Calculate harmonic mean of register values
-        for i in range(Self.m):
-            var reg = self.registers[i]
-            if reg == 0:
-                ez += 1.0
-            else:
-                sum += 1.0 / exp2(Float64(reg))
+        alias vector_width = min(Self.m, 64)
+        for i in range(0, Self.m, vector_width):
+            var reg = self.registers.unsafe_ptr().load[width=vector_width](i)
+            var reg_flag = reg.eq(0)
+            ez += Float32(reg_flag.cast[DType.uint8]().reduce_add())
+            var exp_reg = reg_flag.select(SIMD[DType.float16, vector_width](0), (1 / exp2(reg.cast[DType.float16]())).cast[DType.float16]())
+            sum += exp_reg.reduce_add().cast[DType.float32]()
 
         # Apply LogLog-Beta bias correction
         return Int(Self._get_alpha() * Self.m * (Self.m - ez) / (get_beta[Self.precision](ez) + sum))
@@ -182,7 +183,7 @@ struct HyperLogLog[P: Int]:
             for i in range(Self.m):
                 buffer.append(self.registers[i])
 
-        return buffer
+        return buffer^
 
     @staticmethod
     fn deserialize[TargetP: Int](buffer: List[UInt8]) raises -> HyperLogLog[TargetP]:
